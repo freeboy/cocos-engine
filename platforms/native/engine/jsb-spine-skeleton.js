@@ -605,14 +605,20 @@ const cacheManager = require('./jsb-cache-manager');
         const strName = name.toString();
         this._animationName = strName;
         this._playTimes = loop ? 0 : 1;
+        let res = null;
         if (this._nativeSkeleton) {
             if (this.isAnimationCached()) {
-                return this._nativeSkeleton.setAnimation(strName, loop);
+                res = this._nativeSkeleton.setAnimation(strName, loop);
             } else {
-                return this._nativeSkeleton.setAnimation(trackIndex, strName, loop);
+                res = this._nativeSkeleton.setAnimation(trackIndex, strName, loop);
             }
+            /**
+             * note: since native spine animation update called after Director.EVENT_BEFORE_UPDATE
+             * and before setAnimation. it's need to update native animation to first frame directly.
+             */
+            this._nativeSkeleton.update(0);
         }
-        return null;
+        return res;
     };
 
     skeleton.addAnimation = function (trackIndex, name, loop, delay) {
@@ -795,7 +801,6 @@ const cacheManager = require('./jsb-cache-manager');
     };
 
     const _tempAttachMat4 = cc.mat4();
-    const _identityTrans = new cc.Node();
     let _tempVfmt; let _tempBufferIndex; let _tempIndicesOffset; let _tempIndicesCount;
 
     skeleton._render = function (ui) {
@@ -877,7 +882,7 @@ const cacheManager = require('./jsb-cache-manager');
             _tempIndicesCount = renderInfo[renderInfoOffset + materialIdx++];
 
             const renderData = middleware.RenderInfoLookup[_tempVfmt][_tempBufferIndex];
-            ui.commitComp(this, renderData, realTexture, this._assembler, _identityTrans);
+            ui.commitComp(this, renderData, realTexture, this._assembler, this.node);
             renderData.updateRange(renderData.vertexStart, renderData.vertexCount, _tempIndicesOffset, _tempIndicesCount);
             this.material = mat;
         }

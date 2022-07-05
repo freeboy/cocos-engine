@@ -28,7 +28,8 @@
 #include "Define.h"
 #include "base/RefCounted.h"
 #include "core/assets/Material.h"
-#include "core/geometry/Sphere.h"
+#include "renderer/pipeline/shadow/CSMLayers.h"
+#include "renderer/gfx-base/GFXFramebuffer.h"
 
 namespace cc {
 
@@ -55,19 +56,15 @@ public:
 
     virtual void updatePipelineSceneData() {}
 
-    inline void setShadowFramebuffer(const scene::Light *light, gfx::Framebuffer *framebuffer) { _shadowFrameBufferMap.emplace(light, framebuffer); }
-    inline const ccstd::unordered_map<const scene::Light *, gfx::Framebuffer *> &getShadowFramebufferMap() const { return _shadowFrameBufferMap; }
+    inline void setShadowFramebuffer(const scene::Light *light, gfx::Framebuffer *framebuffer) { _shadowFrameBufferMap[light] = framebuffer; }
+    inline const ccstd::unordered_map<const scene::Light *, IntrusivePtr<gfx::Framebuffer>> &getShadowFramebufferMap() const { return _shadowFrameBufferMap; }
     inline const RenderObjectList &getRenderObjects() const { return _renderObjects; }
-    inline const RenderObjectList &getDirShadowObjects() const { return _dirShadowObjects; }
     inline void setRenderObjects(RenderObjectList &&ro) { _renderObjects = std::forward<RenderObjectList>(ro); }
-    inline void setDirShadowObjects(RenderObjectList &&ro) { _dirShadowObjects = std::forward<RenderObjectList>(ro); }
-    inline const RenderObjectList &isCastShadowObjects() const { return _castShadowObjects; }
-    inline void setCastShadowObjects(RenderObjectList &&ro) { _castShadowObjects = std::forward<RenderObjectList>(ro); }
     inline const ccstd::vector<const scene::Light *> &getValidPunctualLights() const { return _validPunctualLights; }
-    inline void setValidPunctualLights(ccstd::vector<const scene::Light *> &&validPunctualLights) { _validPunctualLights = std::forward<ccstd::vector<const scene::Light *>>(validPunctualLights); }
     inline bool isHDR() const { return _isHDR; }
     inline void setHDR(bool val) { _isHDR = val; }
     inline scene::Shadows *getShadows() const { return _shadow; }
+    inline CSMLayers *getCSMLayers() const { return _csmLayers; }
     inline scene::Ambient *getAmbient() const { return _ambient; }
     inline scene::Skybox *getSkybox() const { return _skybox; }
     inline scene::Fog *getFog() const { return _fog; }
@@ -98,12 +95,11 @@ protected:
     static constexpr uint32_t GEOMETRY_RENDERER_TECHNIQUE_COUNT{6};
 
     RenderObjectList _renderObjects;
-    RenderObjectList _dirShadowObjects;
-    RenderObjectList _castShadowObjects;
+    // `scene::Light *`: weak reference
     ccstd::vector<const scene::Light *> _validPunctualLights;
-    gfx::Buffer *_occlusionQueryVertexBuffer{nullptr};
-    gfx::Buffer *_occlusionQueryIndicesBuffer{nullptr};
-    gfx::InputAssembler *_occlusionQueryInputAssembler{nullptr};
+    IntrusivePtr<gfx::Buffer> _occlusionQueryVertexBuffer;
+    IntrusivePtr<gfx::Buffer> _occlusionQueryIndicesBuffer;
+    IntrusivePtr<gfx::InputAssembler> _occlusionQueryInputAssembler;
 
     IntrusivePtr<Material> _occlusionQueryMaterial{nullptr};
     gfx::Shader *_occlusionQueryShader{nullptr}; // weak reference
@@ -114,19 +110,26 @@ protected:
     ccstd::vector<gfx::Shader *> _geometryRendererShaders; // weak reference
 
     IntrusivePtr<Material> _debugRendererMaterial{nullptr};
-    gfx::Shader *_debugRendererShader{nullptr};
-    scene::Pass *_debugRendererPass{nullptr};
-    gfx::Device *_device{nullptr};
+    gfx::Shader *_debugRendererShader{nullptr}; // weak reference
+    scene::Pass *_debugRendererPass{nullptr}; // weak reference
+    gfx::Device *_device{nullptr}; // weak reference
 
+    // manage memory manually
     scene::Fog *_fog{nullptr};
+    // manage memory manually
     scene::Ambient *_ambient{nullptr};
+    // manage memory manually
     scene::Skybox *_skybox{nullptr};
+    // manage memory manually
     scene::Shadows *_shadow{nullptr};
+    // manage memory manually
     scene::Octree *_octree{nullptr};
+    // manage memory manually
+    CSMLayers *_csmLayers{nullptr};
     bool _isHDR{true};
     float _shadingScale{1.0F};
 
-    ccstd::unordered_map<const scene::Light *, gfx::Framebuffer *> _shadowFrameBufferMap;
+    ccstd::unordered_map<const scene::Light *, IntrusivePtr<gfx::Framebuffer>> _shadowFrameBufferMap;
 };
 
 } // namespace pipeline

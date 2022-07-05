@@ -34,7 +34,7 @@ import { legacyCC } from '../../global-exports';
 import type { SkyboxInfo } from '../../scene-graph/scene-globals';
 import { Root } from '../../root';
 import { GlobalDSManager } from '../../pipeline/global-descriptor-set-manager';
-import { Device } from '../../gfx';
+import { Device, deviceManager } from '../../gfx';
 import { Enum } from '../../value-types';
 
 let skybox_mesh: Mesh | null = null;
@@ -146,6 +146,18 @@ export class Skybox {
     }
 
     /**
+     * @en Whether to use offline baked convolutional maps
+     * @zh 是否使用离线烘焙的卷积图？
+     */
+    get useConvolutionMap (): boolean {
+        if (this.envmap) {
+            return this.envmap.isUsingOfflineMipmaps();
+        } else {
+            return false;
+        }
+    }
+
+    /**
      * @en The texture cube used for the skybox
      * @zh 使用的立方体贴图
      */
@@ -210,7 +222,6 @@ export class Skybox {
     protected _useDiffuseMap = false;
     protected _editableMaterial: MaterialInstance | null = null;
 
-
     public initialize (skyboxInfo: SkyboxInfo) {
         this._enabled = skyboxInfo.enabled;
         this._useIBL = skyboxInfo.useIBL;
@@ -258,13 +269,15 @@ export class Skybox {
             this._model._initWorldBoundDescriptors = () => {};
         }
         let isRGBE = this._default.isRGBE;
+        let isUseConvolutionMap = this._default.isUsingOfflineMipmaps();
         if (this.envmap) {
             isRGBE = this.envmap.isRGBE;
+            isUseConvolutionMap = this.envmap.isUsingOfflineMipmaps();
         }
 
         if (!skybox_material) {
             const mat = new Material();
-            mat.initialize({ effectName: 'skybox', defines: { USE_RGBE_CUBEMAP: isRGBE } });
+            mat.initialize({ effectName: 'pipeline/skybox', defines: { USE_RGBE_CUBEMAP: isRGBE } });
             skybox_material = new MaterialInstance({ parent: mat });
         }
 
@@ -298,13 +311,16 @@ export class Skybox {
         const useIBLValue = this.useIBL ? (this.isRGBE ? 2 : 1) : 0;
         const useDiffuseMapValue = (this.useIBL && this.useDiffuseMap && this.diffuseMap) ? (this.isRGBE ? 2 : 1) : 0;
         const useHDRValue = this.useHDR;
+        const useConvMapValue = this.useConvolutionMap;
 
         if (pipeline.macros.CC_USE_IBL !== useIBLValue
             || pipeline.macros.CC_USE_DIFFUSEMAP !== useDiffuseMapValue
-            || pipeline.macros.CC_USE_HDR !== useHDRValue) {
+            || pipeline.macros.CC_USE_HDR !== useHDRValue
+            || pipeline.macros.CC_IBL_CONVOLUTED !== useConvMapValue) {
             pipeline.macros.CC_USE_IBL = useIBLValue;
             pipeline.macros.CC_USE_DIFFUSEMAP = useDiffuseMapValue;
             pipeline.macros.CC_USE_HDR = useHDRValue;
+            pipeline.macros.CC_IBL_CONVOLUTED = useConvMapValue;
 
             root.onGlobalPipelineStateChanged();
         }
@@ -328,7 +344,7 @@ export class Skybox {
 
     protected _updateGlobalBinding () {
         if (this._globalDSManager) {
-            const device = legacyCC.director.root.device as Device;
+            const device = deviceManager.gfxDevice;
 
             const envmap = this.envmap ? this.envmap : this._default;
             if (envmap) {

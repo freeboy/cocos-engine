@@ -242,12 +242,12 @@ class DeviceEvent : public OSEvent {
 public:
     CONSTRUCT_EVENT(DeviceEvent, OSEventType::DEVICE_OSEVENT)
     enum class Type {
-        DEVICE_MEMORY,
-        DEVICE_ORIENTATION,
+        MEMORY,
+        ORIENTATION,
         UNKNOWN
     };
     EventParameterType args[3];
-    Type type{Type::DEVICE_MEMORY}; // NOLINT(modernize-use-nullptr)
+    Type type{Type::UNKNOWN}; // NOLINT(modernize-use-nullptr)
 };
 
 class EventDispatcher {
@@ -269,6 +269,7 @@ public:
     static void dispatchCloseEvent();
     static void dispatchDestroyWindowEvent();
     static void dispatchRecreateWindowEvent();
+    static void dispatchSceneLoadEvent();
 
     using CustomEventListener = std::function<void(const CustomEvent &)>;
     static uint32_t addCustomEventListener(const ccstd::string &eventName, const CustomEventListener &listener);

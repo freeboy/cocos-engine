@@ -562,7 +562,7 @@ export class Camera {
     private _visibility = CAMERA_DEFAULT_MASK;
     private _exposure = 0;
     private _clearStencil = 0;
-    private _geometryRenderer = legacyCC.internal.GeometryRenderer ? new GeometryRenderer() : null;
+    private _geometryRenderer: GeometryRenderer | null = null;
 
     constructor (device: Device) {
         this._device = device;
@@ -572,7 +572,6 @@ export class Camera {
 
         this._aspect = this.screenScale = 1;
         this._frustum.accurate = true;
-        this._geometryRenderer?.activate(device);
 
         if (!correctionMatrices.length) {
             const ySign = device.capabilities.clipSpaceSignY;
@@ -618,6 +617,8 @@ export class Camera {
      * @zh 销毁相机，开发者不应该使用这个方法，销毁流程是由 RenderScene 管理的。
      */
     public destroy () {
+        this._node = null;
+        this.detachFromScene();
         if (this._window) {
             this._window.detachCamera(this);
             this.window = null!;
@@ -704,6 +705,8 @@ export class Camera {
             this._forward.x = -this._matView.m02;
             this._forward.y = -this._matView.m06;
             this._forward.z = -this._matView.m10;
+            // Remove scale
+            Mat4.multiply(this._matView, new Mat4().scale(this._node.worldScale), this._matView);
             this._node.getWorldPosition(this._position);
             viewProjDirty = true;
         }
@@ -788,6 +791,22 @@ export class Camera {
         this.resize(this.width, this.height);
     }
 
+    /**
+     * @en create geometry renderer for this camera
+     * @zh 创建这个摄像机的几何体渲染器
+     */
+    public initGeometryRenderer() {
+        if (!this._geometryRenderer) {
+            this._geometryRenderer = legacyCC.internal.GeometryRenderer ? new legacyCC.internal.GeometryRenderer() : null;
+            this._geometryRenderer?.activate(this._device);
+        }
+    }
+
+    /**
+     * @en get geometry renderer of this camera
+     * @zh 获取这个摄像机的几何体渲染器
+     * @returns @en return the geometry renderer @zh 返回几何体渲染器
+     */
     get geometryRenderer () {
         return this._geometryRenderer;
     }

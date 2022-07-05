@@ -89,6 +89,7 @@ public:
     void onGlobalPipelineStateChanged() const;
     void onMacroPatchesStateChanged();
     void onGeometryChanged();
+    void initLightingmap(Texture2D *texture, const Vec4 &uvParam);
     void updateLightingmap(Texture2D *texture, const Vec4 &uvParam);
     virtual ccstd::vector<IMacroPatch> getMacroPatches(index_t subModelIndex);
     virtual void updateInstancedAttributes(const ccstd::vector<gfx::Attribute> &attributes, Pass *pass);
@@ -140,7 +141,7 @@ public:
     inline bool isInstancingEnabled() const { return _instMatWorldIdx >= 0; };
     inline int32_t getInstMatWorldIdx() const { return _instMatWorldIdx; }
     inline const ccstd::vector<gfx::Attribute> &getInstanceAttributes() const { return _instanceAttributeBlock.attributes; }
-    inline InstancedAttributeBlock *getInstancedAttributeBlock() { return &_instanceAttributeBlock; }
+    inline InstancedAttributeBlock &getInstancedAttributeBlock() { return _instanceAttributeBlock; }
     inline const uint8_t *getInstancedBuffer() const { return _instanceAttributeBlock.buffer.buffer()->getData(); }
     inline uint32_t getInstancedBufferSize() const { return _instanceAttributeBlock.buffer.length(); }
     inline gfx::Buffer *getLocalBuffer() const { return _localBuffer.get(); }
@@ -163,6 +164,8 @@ public:
     inline bool isDynamicBatching() const { return _isDynamicBatching; }
     inline float getShadowBias() const { return _shadowBias; }
     inline float getShadowNormalBias() const { return _shadowNormalBias; }
+    inline uint32_t getPriority() const { return _priority; }
+    inline void setPriority(uint32_t value) { _priority = value; }
 
     void initLocalDescriptors(index_t subModelIndex);
     void initWorldBoundDescriptors(index_t subModelIndex);
@@ -183,6 +186,8 @@ public:
     }
     inline void setModelBounds(geometry::AABB *bounds) { _modelBounds = bounds; }
     inline bool isModelImplementedInJS() const { return (_type != Type::DEFAULT && _type != Type::SKINNING && _type != Type::BAKED_SKINNING); };
+
+    void setInstancedAttribute(const ccstd::string &name, const float *value, uint32_t byteLength);
 
 protected:
     static void uploadMat4AsVec4x3(const Mat4 &mat, Float32Array &v1, Float32Array &v2, Float32Array &v3);
@@ -223,6 +228,8 @@ protected:
 
     IntrusivePtr<Texture2D> _lightmap;
     Vec4 _lightmapUVParam;
+
+    uint32_t _priority{0};
 
     // For JS
     CallbacksInvoker _eventProcessor;

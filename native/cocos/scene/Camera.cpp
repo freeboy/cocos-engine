@@ -1,8 +1,8 @@
 /****************************************************************************
  Copyright (c) 2021 Xiamen Yaji Software Co., Ltd.
- 
+
  http://www.cocos.com
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated engine source code (the "Software"), a limited,
  worldwide, royalty-free, non-assignable, revocable and non-exclusive license
@@ -10,10 +10,10 @@
  not use Cocos Creator software for developing other software or tools that's
  used for developing games. You are not granted to publish, distribute,
  sublicense, and/or sell copies of Cocos Creator.
- 
+
  The software or tools in this License Agreement are licensed, not sold.
  Xiamen Yaji Software Co., Ltd. reserves all rights not expressly granted to you.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -30,7 +30,9 @@
 #include "math/MathUtil.h"
 #include "renderer/gfx-base/GFXDevice.h"
 #include "renderer/pipeline/Define.h"
-#include "renderer/pipeline/GeometryRenderer.h"
+#if CC_USE_GEOMETRY_RENDERER
+    #include "renderer/pipeline/GeometryRenderer.h"
+#endif
 
 namespace cc {
 namespace scene {
@@ -72,9 +74,6 @@ Camera::Camera(gfx::Device *device)
     _frustum->addRef();
     _frustum->setAccurate(true);
 
-    _geometryRenderer = ccnew pipeline::GeometryRenderer();
-    _geometryRenderer->activate(device);
-
     if (correctionMatrices.empty()) {
         float ySign = _device->getCapabilities().clipSpaceSignY;
         assignMat4(correctionMatrices[static_cast<int>(gfx::SurfaceTransform::IDENTITY)], 1.F, 0, 0, 0, 0, ySign);
@@ -83,6 +82,8 @@ Camera::Camera(gfx::Device *device)
         assignMat4(correctionMatrices[static_cast<int>(gfx::SurfaceTransform::ROTATE_270)], 0, -1, 0, 0, ySign, 0);
     }
 }
+
+Camera::~Camera() = default;
 
 bool Camera::initialize(const ICameraInfo &info) {
     _node = info.node;
@@ -101,12 +102,15 @@ bool Camera::initialize(const ICameraInfo &info) {
 }
 
 void Camera::destroy() {
+    detachFromScene();
     if (_window) {
         _window->detachCamera(this);
         _window = nullptr;
     }
     _name.clear();
+#if CC_USE_GEOMETRY_RENDERER
     CC_SAFE_DESTROY_NULL(_geometryRenderer);
+#endif
     CC_SAFE_RELEASE_NULL(_frustum);
 }
 
@@ -159,7 +163,10 @@ void Camera::update(bool forceUpdate /*false*/) {
     if (_node->getChangedFlags() || forceUpdate) {
         _matView = _node->getWorldMatrix().getInversed();
         _forward.set(-_matView.m[2], -_matView.m[6], -_matView.m[10]);
-
+        Mat4 scaleMat{};
+        scaleMat.scale(_node->getWorldScale());
+        // remove scale
+        Mat4::multiply(scaleMat, _matView, &_matView);
         _position.set(_node->getWorldPosition());
         viewProjDirty = true;
     }
@@ -212,6 +219,15 @@ void Camera::changeTargetWindow(RenderWindow *window) {
             resize(win->getWidth(), win->getHeight());
         }
     }
+}
+
+void Camera::initGeometryRenderer() {
+#if CC_USE_GEOMETRY_RENDERER
+    if (!_geometryRenderer) {
+        _geometryRenderer = ccnew pipeline::GeometryRenderer();
+        _geometryRenderer->activate(_device);
+    }
+#endif
 }
 
 void Camera::detachCamera() {
@@ -274,15 +290,14 @@ Vec3 Camera::screenToWorld(const Vec3 &screenPos) {
         // transform to world
         out.x = out.x * preTransform[0] + out.y * preTransform[2] * ySign;
         out.y = out.x * preTransform[1] + out.y * preTransform[3] * ySign;
-        _matViewProjInv.transformPoint(&out);
-
+        out.transformMat4(out, _matViewProjInv);
         // lerp to depth z
         Vec3 tmpVec3;
         if (_node) {
             tmpVec3.set(_node->getWorldPosition());
         }
 
-        out = out.lerp(tmpVec3, MathUtil::lerp(_nearClip / _farClip, 1, screenPos.z));
+        out = tmpVec3.lerp(out, MathUtil::lerp(_nearClip / _farClip, 1, screenPos.z));
     } else {
         out.set(
             (screenPos.x - cx) / cw * 2 - 1,
@@ -292,7 +307,7 @@ Vec3 Camera::screenToWorld(const Vec3 &screenPos) {
         // transform to world
         out.x = out.x * preTransform[0] + out.y * preTransform[2] * ySign;
         out.y = out.x * preTransform[1] + out.y * preTransform[3] * ySign;
-        _matViewProjInv.transformPoint(&out);
+        out.transformMat4(out, _matViewProjInv);
     }
 
     return out;
@@ -357,17 +372,17 @@ void Camera::updateAspect(bool oriented) {
     _isProjDirty = true;
 }
 
-void Camera::setViewport(const Vec4 &val) {
+void Camera::setViewport(const gfx::Rect &val) {
     debug::warnID(8302);
     setViewportInOrientedSpace(val);
 }
 
-void Camera::setViewportInOrientedSpace(const Vec4 &val) {
-    const float x = val.x;
-    const float width = val.z;
-    const float height = val.w;
+void Camera::setViewportInOrientedSpace(const gfx::Rect &val) {
+    const auto x = static_cast<float>(val.x);
+    const auto width = static_cast<float>(val.width);
+    const auto height = static_cast<float>(val.height);
 
-    const float y = _device->getCapabilities().screenSpaceSignY < 0 ? 1 - val.y - height : val.y;
+    const auto y = _device->getCapabilities().screenSpaceSignY < 0 ? 1 - static_cast<float>(val.y) - height : static_cast<float>(val.y);
 
     auto *swapchain = getWindow()->getSwapchain();
     const auto orientation = swapchain ? swapchain->getSurfaceTransform() : gfx::SurfaceTransform::IDENTITY;

@@ -30,7 +30,7 @@
  */
 /* eslint-disable max-len */
 import { getPhaseID, InstancedBuffer, PipelineStateManager } from '..';
-import { AccessFlagBit, Buffer, ClearFlagBit, Color, ColorAttachment, CommandBuffer, DepthStencilAttachment, Device, Format, Framebuffer,
+import { AccessFlagBit, Buffer, ClearFlagBit, Color, ColorAttachment, CommandBuffer, DepthStencilAttachment, Device, deviceManager, Format, Framebuffer,
     FramebufferInfo, GeneralBarrierInfo, LoadOp, PipelineState, Rect, RenderPass, RenderPassInfo, StoreOp, Swapchain, Texture, TextureInfo,
     TextureType, TextureUsageBit, Viewport } from '../../gfx';
 import { legacyCC } from '../../global-exports';
@@ -414,6 +414,7 @@ class DevicePreSceneTask extends WebSceneTask {
         }
         const hash = (0 << 30) | pass.priority << 16 | subModel.priority << 8 | passIdx;
         const rp = new RenderInfo();
+        rp.priority = ro.model.priority;
         rp.hash = hash;
         rp.depth = ro.depth || 0;
         rp.shaderId = shader.typedID;
@@ -435,7 +436,7 @@ class DevicePreSceneTask extends WebSceneTask {
      * @zh 比较排序函数。半透明对象按优先级 -> 深度由后向前 -> Shader ID 顺序排序。
      */
     protected _transparentCompareFn (a: RenderInfo, b: RenderInfo) {
-        return (a.hash - b.hash) || (b.depth - a.depth) || (a.shaderId - b.shaderId);
+        return (a.priority - b.priority) || (a.hash - b.hash) || (b.depth - a.depth) || (a.shaderId - b.shaderId);
     }
 
     private _uploadInstanceBuffers () {
@@ -490,7 +491,7 @@ class DeviceSceneTask extends WebSceneTask {
             const { inputAssembler } = subModel;
             const pass = subModel.passes[passIdx];
             const shader = subModel.shaders[passIdx];
-            const pso = PipelineStateManager.getOrCreatePipelineState(legacyCC.director.root.device,
+            const pso = PipelineStateManager.getOrCreatePipelineState(deviceManager.gfxDevice,
                 pass, shader, this._renderPass, inputAssembler);
             this.visitor.bindPipelineState(pso);
             this.visitor.bindDescriptorSet(SetIndex.MATERIAL, pass.descriptorSet);
@@ -514,7 +515,7 @@ class DeviceSceneTask extends WebSceneTask {
                     const instance = instances[b];
                     if (!instance.count) { continue; }
                     const shader = instance.shader!;
-                    const pso = PipelineStateManager.getOrCreatePipelineState(legacyCC.director.root.device, pass,
+                    const pso = PipelineStateManager.getOrCreatePipelineState(deviceManager.gfxDevice, pass,
                         shader, this._renderPass, instance.ia);
                     if (lastPSO !== pso) {
                         this.visitor.bindPipelineState(pso);
@@ -539,7 +540,7 @@ class DeviceSceneTask extends WebSceneTask {
                 if (!batch.mergeCount) { continue; }
                 if (!boundPSO) {
                     const shader = batch.shader!;
-                    const pso = PipelineStateManager.getOrCreatePipelineState(legacyCC.director.root.device, batch.pass,
+                    const pso = PipelineStateManager.getOrCreatePipelineState(deviceManager.gfxDevice, batch.pass,
                         shader, this._renderPass, batch.ia);
                     this.visitor.bindPipelineState(pso);
                     this.visitor.bindDescriptorSet(SetIndex.MATERIAL, batch.pass.descriptorSet);
@@ -570,7 +571,7 @@ class DeviceSceneTask extends WebSceneTask {
                 if (pass.phase !== this._currentQueue.phaseID) continue;
                 const shader = batch.shaders[j];
                 const inputAssembler: any = batch.inputAssembler!;
-                const pso = PipelineStateManager.getOrCreatePipelineState(legacyCC.director.root.device, pass, shader, this._renderPass, inputAssembler);
+                const pso = PipelineStateManager.getOrCreatePipelineState(deviceManager.gfxDevice, pass, shader, this._renderPass, inputAssembler);
                 this.visitor.bindPipelineState(pso);
                 this.visitor.bindDescriptorSet(SetIndex.MATERIAL, pass.descriptorSet);
                 const ds = batch.descriptorSet!;

@@ -57,11 +57,7 @@ Material::Material() {
 Material::~Material() = default;
 
 void Material::initialize(const IMaterialInfo &info) {
-    // cjh FIXME: remove hacking code here
-    if (!BuiltinResMgr::getInstance()->isInitialized()) {
-        BuiltinResMgr::getInstance()->initBuiltinRes(gfx::Device::getInstance());
-    }
-    //
+
     auto &passes = *_passes;
     if (!passes.empty()) {
         debug::warnID(12005);
@@ -158,6 +154,11 @@ void Material::setProperty(const ccstd::string &name, const MaterialPropertyVari
     if (!success) {
         CC_LOG_WARNING("illegal property name: %s.", name.c_str());
     }
+}
+
+void Material::setPropertyNull(const ccstd::string &name, index_t passIdx) {
+    MaterialPropertyVariant val;
+    setProperty(name, val, passIdx);
 }
 
 #define CC_MATERIAL_SETPROPERTY_IMPL(funcNameSuffix, type)                                                                     \
@@ -403,7 +404,7 @@ bool Material::uploadProperty(scene::Pass *pass, const ccstd::string &name, cons
     return true;
 }
 
-void Material::bindTexture(scene::Pass *pass, uint32_t handle, const MaterialProperty &val, index_t index /* = CC_INVALID_INDEX*/) {
+void Material::bindTexture(scene::Pass *pass, uint32_t handle, const MaterialProperty &val, uint32_t index) {
     if (pass == nullptr) {
         return;
     }
@@ -436,7 +437,7 @@ void Material::initDefault(const ccstd::optional<ccstd::string> &uuid) {
     Super::initDefault(uuid);
     MacroRecord defines{{"USE_COLOR", true}};
     IMaterialInfo info;
-    info.effectName = ccstd::string{"unlit"};
+    info.effectName = ccstd::string{"builtin-unlit"};
     info.defines = IMaterialInfo::DefinesType{defines};
     initialize(info);
     setProperty("mainColor", Color{0xFF, 0x00, 0xFF, 0xFF});

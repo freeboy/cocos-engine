@@ -26,9 +26,9 @@ module.exports = {
             StartChar: 'Start Char',
             FontSize: 'Font Size',
         },
-        particle:{
-            spriteFrame:'Sprite Frame',
-            spriteFrameTip:'Sprite Frame',
+        particle: {
+            spriteFrame: 'Sprite Frame',
+            spriteFrameTip: 'Sprite Frame',
         },
         erpTextureCube: {
             anisotropy: 'Anisotropy',
@@ -43,6 +43,7 @@ module.exports = {
             mipFilterTip: 'Mip Filter',
             wrapModeSTip: 'Wrap Mode S',
             wrapModeTTip: 'Wrap Mode T',
+            bakeReflectionConvolution: 'Bake Reflection Convolution',
             faceSize: {
                 name: 'Face Size',
                 title:
@@ -127,6 +128,14 @@ module.exports = {
             borderRightTip: '九宫格右边距',
             edit: 'Edit',
             editTip: '编辑',
+            meshType: 'Mesh Type',
+            meshTypeTip: 'SpriteFrame 生成的网格类型',
+            pixelsToUnit: 'Pixels To Unit',
+            pixelsToUnitTip: 'SpriteFrame 像素对应世界空间内单位长度的比例尺',
+            pivotX: 'Pivot X',
+            pivotXTip: 'SpriteFrame 本地坐标系原点的 X 轴位置',
+            pivotY: 'Pivot Y',
+            pivotYTip: 'SpriteFrame 本地坐标系原点的 Y 轴位置',
         },
         texture: {
             anisotropy: 'Anisotropy',
@@ -151,8 +160,8 @@ module.exports = {
             modelPreview: '模型预览',
             material: '材质',
             fbx: 'FBX',
-            no_model_tips:'没有模型可供预览',
-            drag_model_tips:'可将模型拖到这里进行预览',
+            no_model_tips: '没有模型可供预览',
+            drag_model_tips: '可将模型拖到这里进行预览',
             GlTFUserData: {
                 normals: {
                     name: '法线',
@@ -244,7 +253,7 @@ module.exports = {
                 original: '原始',
             },
             limitMaterialDumpDir: '提取的路径需要限定在项目路径范围内',
-            legacyOptions:'旧版本遗留',
+            legacyOptions: '旧版本遗留',
             legacyFbxImporter: {
                 name: '与 1.* 版本兼容',
                 title: '此导入器是否应该与其在 Cocos Creator 1.* 之前版本的导入方式兼容。',
@@ -259,6 +268,12 @@ module.exports = {
                     'useBakedAnimation 选项未勾选时)，可以勾选此项以提升性能。<br>' +
                     '但注意改变此选项会影响生成的 prefab 内容，需要对应更新场景中的引用。<br>' +
                     '后续重构会移除此流程。',
+            },
+            allowMeshDataAccess: {
+                name: '允许数据访问',
+                title:
+                    '标识此模型中的所有网格的数据是否可被读写，此接口只对静态网格资源生效，<br> ' +
+                    '若不勾选，网格数据被提交到 GPU 后会被自动释放。<br>',
             },
             meshOptimizer: {
                 name: 'Mesh Optimizer',
@@ -317,7 +332,7 @@ module.exports = {
             smartMaterialEnabled: {
                 name: '材质智能转换',
                 title: '将 DCC 材质转化为引擎材质, 并匹对 DCC 材质的光照模型',
-                warn: '偏好设置里的实验室功能 "材质智能转换" 已关闭，请启用此项功能来修改模型级别设置。',
+                warn: '项目设置里的模型配置 "材质智能转换" 已关闭，请启用此项功能来修改模型级别设置。',
             },
         },
         textureCube: {
@@ -334,7 +349,7 @@ module.exports = {
             wrapModeT: 'Wrap Mode T',
             wrapModeTTip: 'Wrap Mode T',
             modeWarn:
-            '警告：WebGL 1.0 平台不支持非 2 次幂贴图的 repeat 过滤模式，运行时会自动改为 clamp-to-edge 模式，这会使材质的 tilingOffset 等属性完全失效。',
+                '警告：WebGL 1.0 平台不支持非 2 次幂贴图的 repeat 过滤模式，运行时会自动改为 clamp-to-edge 模式，这会使材质的 tilingOffset 等属性完全失效。',
         },
         material: {
             'fail-to-load-custom-inspector': 'material: 自定义 effect {effect} 的 inspector 加载失败',

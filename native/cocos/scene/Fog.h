@@ -172,7 +172,7 @@ public:
      * @en Global fog range, only for layered fog
      */
     inline float getFogRange() const { return _fogRange; }
-    inline void setfogRange(float val) { _fogRange = val; }
+    inline void setFogRange(float val) { _fogRange = val; }
 
     const Vec4 &getColorArray() const { return _colorArray; }
 
@@ -334,7 +334,7 @@ public:
     // @serializable
     float _fogStart{0.5F};
     // @serializable
-    float _fogEnd{0.5F};
+    float _fogEnd{300.F};
     // @serializable
     float _fogAtten{5.F};
     // @serializable
@@ -343,6 +343,7 @@ public:
     float _fogRange{1.2F};
     // @serializable
     bool _accurate{false};
+    // weak reference
     Fog *_resource{nullptr};
 };
 

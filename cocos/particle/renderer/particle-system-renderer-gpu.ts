@@ -28,7 +28,7 @@ import { builtinResMgr } from '../../core/builtin';
 import { Material } from '../../core/assets';
 import { Texture2D } from '../../core';
 import { Component } from '../../core/components';
-import { AttributeName, Format, Attribute, API } from '../../core/gfx';
+import { AttributeName, Format, Attribute, API, deviceManager } from '../../core/gfx';
 import { Mat4, Vec2, Vec4, Quat, Vec3 } from '../../core/math';
 import { MaterialInstance, IMaterialInstanceInfo } from '../../core/renderer/core/material-instance';
 import { MacroRecord } from '../../core/renderer/core/pass-utils';
@@ -262,7 +262,7 @@ export default class ParticleSystemRendererGPU extends ParticleSystemRendererBas
                 for (let i = 0; i < cameraLst?.length; ++i) {
                     const camera:Camera = cameraLst[i];
                     // eslint-disable-next-line max-len
-                    const checkCamera: boolean = !EDITOR ? (camera.visibility & this._particleSystem.node.layer) === this._particleSystem.node.layer : camera.name === 'Editor Camera';
+                    const checkCamera: boolean = (!EDITOR || legacyCC.GAME_VIEW) ? (camera.visibility & this._particleSystem.node.layer) === this._particleSystem.node.layer : camera.name === 'Editor Camera';
                     if (checkCamera) {
                         Quat.fromViewUp(_node_rot, camera.forward);
                         break;
@@ -296,7 +296,7 @@ export default class ParticleSystemRendererGPU extends ParticleSystemRendererBas
     }
 
     public updateParticles (dt: number) {
-        if (EDITOR) {
+        if (EDITOR && !legacyCC.GAME_VIEW) {
             const mat: Material | null = this._particleSystem.getMaterialInstance(0) || this._defaultMat;
 
             this._particleSystem.node.getWorldMatrix(_tempWorldTrans);
@@ -469,7 +469,7 @@ export default class ParticleSystemRendererGPU extends ParticleSystemRendererBas
             pass.setUniform(infoHandle, _tempVec4);
         }
 
-        this._defines[USE_VK_SHADER] = legacyCC.game._gfxDevice.gfxAPI === API.VULKAN;
+        this._defines[USE_VK_SHADER] = deviceManager.gfxDevice.gfxAPI === API.VULKAN;
         this._defines[INSTANCE_PARTICLE] = this._useInstance;
     }
 
@@ -529,7 +529,7 @@ export default class ParticleSystemRendererGPU extends ParticleSystemRendererBas
         if (shareMaterial !== null) {
             const effectName = shareMaterial._effectAsset._name;
             this._renderInfo!.mainTexture = shareMaterial.getProperty('mainTexture', 0);
-            if (effectName.indexOf('particle-gpu') === -1) {
+            if (effectName.indexOf('builtin-particle-gpu') === -1) {
                 this._renderInfo!.mainTexture = shareMaterial.getProperty('mainTexture', 0);
                 // reset material
                 this._particleSystem.setMaterial(null, 0);
@@ -602,5 +602,9 @@ export default class ParticleSystemRendererGPU extends ParticleSystemRendererBas
             this._model.doDestroy();
         }
         this.updateRenderMode();
+    }
+
+    public getNoisePreview (out: number[], width: number, height: number) {
+
     }
 }

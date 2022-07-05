@@ -28,7 +28,7 @@ import { TEST, EDITOR } from 'internal:constants';
 import { MeshRenderer } from '../3d/framework/mesh-renderer';
 import { createMesh } from '../3d/misc';
 import { Material } from '../core/assets/material';
-import { Format, TextureType, TextureUsageBit, Texture, TextureInfo, Device, BufferTextureCopy, Swapchain } from '../core/gfx';
+import { Format, TextureType, TextureUsageBit, Texture, TextureInfo, Device, BufferTextureCopy, Swapchain, deviceManager } from '../core/gfx';
 import { Layers } from '../core/scene-graph';
 import { Node } from '../core/scene-graph/node';
 import { ICounterOption } from './counter';
@@ -36,9 +36,10 @@ import { PerfCounter } from './perf-counter';
 import { legacyCC } from '../core/global-exports';
 import { Pass } from '../core/renderer';
 import { preTransforms } from '../core/math/mat4';
-import { JSB } from '../core/default-constants';
 import { Root } from '../core/root';
 import { PipelineRuntime } from '../core/pipeline/custom/pipeline';
+import { director, System } from '../core';
+import { Settings, settings } from '../core/settings';
 
 const _characters = '0123456789. ';
 
@@ -92,12 +93,11 @@ const _constants = {
     textureHeight: 256,
 };
 
-export class Profiler {
+export class Profiler extends System {
     /**
      * @deprecated since v3.5.0, this is an engine private interface that will be removed in the future.
      */
     public _stats: IProfilerState | null = null;
-    public id = '__Profiler__';
 
     private _showFPS = false;
 
@@ -128,10 +128,21 @@ export class Profiler {
     private lastTime = 0;   // update use time
 
     constructor () {
+        super();
         if (!TEST) {
             this._canvas = document.createElement('canvas');
             this._ctx = this._canvas.getContext('2d')!;
             this._canvasArr.push(this._canvas);
+        }
+    }
+
+    init () {
+        this.reset();
+        const showFPS = !!settings.querySettings(Settings.Category.PROFILING, 'showFPS');
+        if (showFPS) {
+            this.showStats();
+        } else {
+            this.hideStats();
         }
     }
 
@@ -181,7 +192,7 @@ export class Profiler {
             legacyCC.director.off(legacyCC.Director.EVENT_BEFORE_DRAW, this.beforeDraw, this);
             legacyCC.director.off(legacyCC.Director.EVENT_AFTER_DRAW, this.afterDraw, this);
             this._showFPS = false;
-            this._pipeline.profiler = null;
+            director.root!.pipeline.profiler = null;
             legacyCC.game.config.showFPS = false;
         }
     }
@@ -190,15 +201,15 @@ export class Profiler {
         if (!this._showFPS) {
             if (!this._device) {
                 const root = legacyCC.director.root as Root;
-                this._device = root.device;
+                this._device = deviceManager.gfxDevice;
                 this._swapchain = root.mainWindow!.swapchain;
                 this._pipeline = root.pipeline;
             }
-            if (!EDITOR) {
+            if (!EDITOR || legacyCC.GAME_VIEW) {
                 this.generateCanvas();
             }
             this.generateStats();
-            if (!EDITOR) {
+            if (!EDITOR || legacyCC.GAME_VIEW) {
                 legacyCC.game.once(legacyCC.Game.EVENT_ENGINE_INITED, this.generateNode, this);
             } else {
                 this._inited = true;
@@ -265,13 +276,13 @@ export class Profiler {
         let i = 0;
         for (const id in _profileInfo) {
             const element = _profileInfo[id];
-            if (!EDITOR) this._ctx.fillText(element.desc, 0, i * this._lineHeight);
+            if (!EDITOR || legacyCC.GAME_VIEW) this._ctx.fillText(element.desc, 0, i * this._lineHeight);
             element.counter = new PerfCounter(id, element, now);
             i++;
         }
         this._totalLines = i;
         this._wordHeight = this._totalLines * this._lineHeight / this._canvas.height;
-        if (!EDITOR) {
+        if (!EDITOR || legacyCC.GAME_VIEW) {
             for (let j = 0; j < _characters.length; ++j) {
                 const offset = this._ctx.measureText(_characters[j]).width;
                 this._eachNumWidth = Math.max(this._eachNumWidth, offset);
@@ -284,7 +295,7 @@ export class Profiler {
 
         this._stats = _profileInfo as IProfilerState;
         this._canvasArr[0] = this._canvas;
-        if (!EDITOR) this._device!.copyTexImagesToTexture(this._canvasArr, this._texture!, this._regionArr);
+        if (!EDITOR || legacyCC.GAME_VIEW) this._device!.copyTexImagesToTexture(this._canvasArr, this._texture!, this._regionArr);
     }
 
     public generateNode () {
@@ -293,6 +304,7 @@ export class Profiler {
         }
 
         this._rootNode = new Node('PROFILER_NODE');
+        this._rootNode._objFlags = legacyCC.Object.Flags.DontSave | legacyCC.Object.Flags.HideInHierarchy;
         legacyCC.game.addPersistRootNode(this._rootNode);
 
         const managerNode = new Node('Profiler_Root');
@@ -346,7 +358,7 @@ export class Profiler {
         });
 
         const _material = new Material();
-        _material.initialize({ effectName: 'profiler' });
+        _material.initialize({ effectName: 'util/profiler' });
 
         const pass = this.pass = _material.passes[0];
         const hTexture = pass.getBinding('mainTexture');
@@ -409,7 +421,7 @@ export class Profiler {
             return;
         }
 
-        if (!EDITOR) {
+        if (!EDITOR || legacyCC.GAME_VIEW) {
             const surfaceTransform = this._swapchain!.surfaceTransform;
             const clipSpaceSignY = this._device!.capabilities.clipSpaceSignY;
             if (surfaceTransform !== this.offsetData[3]) {
@@ -425,7 +437,7 @@ export class Profiler {
             this.pass._rootBufferDirty = true;
         }
 
-        if (this._meshRenderer.model) this._pipeline.profiler = this._meshRenderer.model;
+        if (this._meshRenderer.model) director.root!.pipeline.profiler = this._meshRenderer.model;
 
         const now = performance.now();
         (this._stats.render.counter as PerfCounter).start(now);
@@ -454,7 +466,7 @@ export class Profiler {
         (this._stats.tricount.counter as PerfCounter).value = device.numTris;
 
         let i = 0;
-        if (!EDITOR) {
+        if (!EDITOR || legacyCC.GAME_VIEW) {
             const view = this.digitsData;
             for (const id in this._stats) {
                 const stat = this._stats[id] as ICounterOption;
@@ -474,4 +486,5 @@ export class Profiler {
 }
 
 export const profiler = new Profiler();
+director.registerSystem('profiler', profiler, 0);
 legacyCC.profiler = profiler;

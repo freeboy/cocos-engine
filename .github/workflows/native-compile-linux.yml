@@ -1,10 +1,21 @@
 name: <Native> Linux
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+    - 'templates/**'
+    - 'native/**'
+
+# github.head_ref is only defined on pull_request events
+concurrency:
+  group: ${{ github.workflow }}-${{ github.actor }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   compile_linux:
     name: "Linux-Ubuntu"
+    if: 
+      (! contains(github.event.pull_request.body, '[X] does not change any runtime related code or build configuration'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -13,7 +24,14 @@ jobs:
         run: |
           EXT_VERSION=`node ./.github/workflows/get-native-external-version.js`
           git clone --branch $EXT_VERSION --depth 1 https://github.com/cocos-creator/engine-native-external native/external
+      - uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r21e
+          add-to-path: false
       - name: Generate bindings
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           python3 -m pip install PyYAML==5.4.1 Cheetah3
           python3 ./native/tools/tojs/genbindings.py

@@ -62,9 +62,9 @@ bool Device::initialize(const DeviceInfo &info) {
 #endif
 
     bool result = doInit(info);
-    _cmdBuff->addRef();
-    _queue->addRef();
 
+    CC_SAFE_ADD_REF(_cmdBuff);
+    CC_SAFE_ADD_REF(_queue);
     return result;
 }
 
@@ -83,6 +83,11 @@ void Device::destroy() {
         CC_SAFE_DELETE(pair.second);
     }
     _textureBarriers.clear();
+
+    for (auto pair : _bufferBarriers) {
+        CC_SAFE_DELETE(pair.second);
+    }
+    _bufferBarriers.clear();
 
     doDestroy();
 
@@ -128,6 +133,13 @@ TextureBarrier *Device::getTextureBarrier(const TextureBarrierInfo &info) {
         _textureBarriers[info] = createTextureBarrier(info);
     }
     return _textureBarriers[info];
+}
+
+BufferBarrier *Device::getBufferBarrier(const BufferBarrierInfo &info) {
+    if (!_bufferBarriers.count(info)) {
+        _bufferBarriers[info] = createBufferBarrier(info);
+    }
+    return _bufferBarriers[info];
 }
 
 } // namespace gfx

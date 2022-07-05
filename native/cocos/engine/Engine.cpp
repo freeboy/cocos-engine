@@ -24,6 +24,7 @@
 ****************************************************************************/
 
 #include "engine/Engine.h"
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <sstream>
@@ -59,7 +60,9 @@
 #include "core/assets/FreeTypeFont.h"
 #include "network/HttpClient.h"
 #include "platform/interfaces/modules/ISystemWindow.h"
-#include "profiler/DebugRenderer.h"
+#if CC_USE_DEBUG_RENDERER
+    #include "profiler/DebugRenderer.h"
+#endif
 #include "profiler/Profiler.h"
 
 namespace {
@@ -92,7 +95,13 @@ bool setCanvasCallback(se::Object * /*global*/) {
 
 namespace cc {
 
-Engine::Engine() {
+Engine::Engine() = default;
+
+Engine::~Engine() {
+    destroy();
+}
+
+int32_t Engine::init() {
     _scheduler = std::make_shared<Scheduler>();
     _fs = createFileUtils();
     // May create gfx device in render subsystem in future.
@@ -100,16 +109,36 @@ Engine::Engine() {
     _programLib = ccnew ProgramLib();
     _builtinResMgr = ccnew BuiltinResMgr;
 
+#if CC_USE_DEBUG_RENDERER
     _debugRenderer = ccnew DebugRenderer();
+#endif
+
 #if CC_USE_PROFILER
     _profiler = ccnew Profiler();
 #endif
 
     _scriptEngine = ccnew se::ScriptEngine();
     EventDispatcher::init();
+
+    BasePlatform *platform = BasePlatform::getPlatform();
+    platform->setHandleEventCallback(
+        std::bind(&Engine::handleEvent, this, std::placeholders::_1)); // NOLINT(modernize-avoid-bind)
+
+    platform->setHandleTouchEventCallback(
+        std::bind(&Engine::handleTouchEvent, this, std::placeholders::_1)); // NOLINT(modernize-avoid-bind)
+
+    se::ScriptEngine::getInstance()->addRegisterCallback(setCanvasCallback);
+    emit(static_cast<int>(ON_START));
+    _inited = true;
+    return 0;
 }
 
-Engine::~Engine() {
+void Engine::destroy() {
+    cc::DeferredReleasePool::clear();
+    _scheduler->removeAllFunctionsToBePerformedInCocosThread();
+    _scheduler->unscheduleAll();
+    CCObject::deferredDestroy();
+
 #if CC_USE_AUDIO
     AudioEngine::end();
 #endif
@@ -125,11 +154,15 @@ Engine::~Engine() {
 #endif
     // Profiler depends on DebugRenderer, should delete it after deleting Profiler,
     // and delete DebugRenderer after RenderPipeline::destroy which destroy DebugRenderer.
+#if CC_USE_DEBUG_RENDERER
     delete _debugRenderer;
+#endif
 
     //TODO(): Delete some global objects.
-
+#if CC_USE_DEBUG_RENDERER
+    // FreeTypeFontFace is only used in DebugRenderer now, so use CC_USE_DEBUG_RENDERER macro temporarily
     FreeTypeFontFace::destroyFreeType();
+#endif
 
 #if CC_USE_DRAGONBONES
     dragonBones::ArmatureCacheMgr::destroyInstance();
@@ -150,20 +183,8 @@ Engine::~Engine() {
     CC_SAFE_DESTROY_AND_DELETE(_gfxDevice);
     delete _fs;
     _scheduler.reset();
-}
 
-int32_t Engine::init() {
-    BasePlatform *platform = BasePlatform::getPlatform();
-    platform->setHandleEventCallback(
-        std::bind(&Engine::handleEvent, this, std::placeholders::_1)); // NOLINT(modernize-avoid-bind)
-
-    platform->setHandleTouchEventCallback(
-        std::bind(&Engine::handleTouchEvent, this, std::placeholders::_1)); // NOLINT(modernize-avoid-bind)
-
-    se::ScriptEngine::getInstance()->addRegisterCallback(setCanvasCallback);
-    emit(static_cast<int>(ON_START));
-    _inited = true;
-    return 0;
+    _inited = false;
 }
 
 int32_t Engine::run() {
@@ -201,6 +222,9 @@ void Engine::close() { // NOLINT
     _scheduler->unscheduleAll();
 
     BasePlatform::getPlatform()->setHandleEventCallback(nullptr);
+
+    // TODO(timlyeee): The code below is a hack on v3.6, and should be replaced in the future.
+    exit(0);
 }
 
 uint Engine::getTotalFrames() const {
@@ -237,7 +261,7 @@ void Engine::tick() {
         CC_PROFILE(EngineTick);
 
         if (_needRestart) {
-            restartVM();
+            doRestart();
             _needRestart = false;
         }
 
@@ -276,43 +300,10 @@ void Engine::tick() {
     CC_PROFILER_END_FRAME;
 }
 
-int32_t Engine::restartVM() {
+void Engine::doRestart() {
     cc::EventDispatcher::dispatchRestartVM();
-
-    cc::DeferredReleasePool::clear();
-#if CC_USE_AUDIO
-    cc::AudioEngine::stopAll();
-#endif
-    //#if CC_USE_SOCKET
-    //    cc::network::WebSocket::closeAllConnections();
-    //#endif
-    cc::network::HttpClient::destroyInstance();
-
-    _scheduler->removeAllFunctionsToBePerformedInCocosThread();
-    _scheduler->unscheduleAll();
-
-    _scriptEngine->cleanup();
-    cc::EventDispatcher::destroy();
-    CCObject::deferredDestroy();
-
-    delete _programLib;
-    delete _builtinResMgr;
-    CC_SAFE_DESTROY_AND_DELETE(_gfxDevice);
-
-    // remove all listening events
-    offAll();
-    // start
-    _gfxDevice = gfx::DeviceManager::create();
-    // Should re-create ProgramLib as shaders may change after restart. For example,
-    // program update resources and do restart.
-    _programLib = ccnew ProgramLib;
-    // Should reinitialize builtin resources as _programLib will be re-created.
-    _builtinResMgr = ccnew BuiltinResMgr;
-    cc::EventDispatcher::init();
+    destroy();
     CC_CURRENT_APPLICATION()->init();
-
-    cc::gfx::DeviceManager::addSurfaceEventListener();
-    return 0;
 }
 
 bool Engine::handleEvent(const OSEvent &ev) {
@@ -341,7 +332,7 @@ bool Engine::handleEvent(const OSEvent &ev) {
 
 bool Engine::handleTouchEvent(const TouchEvent &ev) { // NOLINT(readability-convert-member-functions-to-static)
     cc::EventDispatcher::dispatchTouchEvent(ev);
-    return true;
+    return dispatchEventToApp(OSEventType::TOUCH_OSEVENT, ev);
 }
 
 Engine::SchedulerPtr Engine::getScheduler() const {
@@ -349,11 +340,15 @@ Engine::SchedulerPtr Engine::getScheduler() const {
 }
 
 bool Engine::dispatchDeviceEvent(const DeviceEvent &ev) { // NOLINT(readability-convert-member-functions-to-static)
-    if (ev.type == DeviceEvent::Type::DEVICE_MEMORY) {
+    bool isHandled = false;
+    if (ev.type == DeviceEvent::Type::MEMORY) {
         cc::EventDispatcher::dispatchMemoryWarningEvent();
-        return true;
+        isHandled = true;
+    } else if (ev.type == DeviceEvent::Type::ORIENTATION) {
+        cc::EventDispatcher::dispatchOrientationChangeEvent(ev.args[0].intVal);
+        isHandled = true;
     }
-    return false;
+    return isHandled;
 }
 
 bool Engine::dispatchWindowEvent(const WindowEvent &ev) {

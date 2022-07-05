@@ -144,6 +144,7 @@ void EventDispatcher::dispatchTouchEvent(const TouchEvent &touchEvent) {
     se::ValueArray args;
     args.emplace_back(se::Value(jsTouchObjArray));
     EventDispatcher::doDispatchJsEvent(eventName, args);
+    EventDispatcher::dispatchCustomEvent(eventName,0);
 }
 
 void EventDispatcher::dispatchMouseEvent(const MouseEvent &mouseEvent) {
@@ -332,6 +333,10 @@ void EventDispatcher::dispatchRecreateWindowEvent() {
 #else
     EventDispatcher::dispatchCustomEvent(EVENT_RECREATE_WINDOW, 0);
 #endif
+}
+
+void EventDispatcher::dispatchSceneLoadEvent() {
+    EventDispatcher::dispatchCustomEvent(EVENT_SCENE_LOAD, 0);
 }
 
 void EventDispatcher::doDispatchJsEvent(const char *jsFunctionName, const std::vector<se::Value> &args) {

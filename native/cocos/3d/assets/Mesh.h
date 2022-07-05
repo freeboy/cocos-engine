@@ -104,6 +104,10 @@ public:
         ccstd::optional<uint32_t> jointMapIndex;
     };
 
+    /**
+    * @en The info use to create dynamic mesh.
+    * @zh 描述了创建动态网格需要的预分配信息。
+    */
     struct IDynamicInfo {
         /**
          * @en max submesh count
@@ -124,6 +128,10 @@ public:
         uint32_t maxSubMeshIndices{0U};
     };
 
+    /**
+    * @en The structure use to create dynamic mesh.
+    * @zh 描述了创建动态网格的结构。
+    */
     struct IDynamicStruct {
         /**
          * @en dynamic mesh info
@@ -405,6 +413,15 @@ public:
     bool copyIndices(index_t primitiveIndex, TypedArray &outputArray);
 
     /**
+     * @en Read the format by attributeName of submesh
+     * @zh 根据属性名读取子网格的属性信息。
+     * @param primitiveIndex @en Sub mesh index @zh 子网格索引
+     * @param attributeName @en Attribute name @zh 属性名称
+     * @returns @en Return null if failed to read format, return the format otherwise. @zh 读取失败返回 null， 否则返回 format
+     */
+    const gfx::FormatInfo *readAttributeFormat(index_t primitiveIndex, const char *attributeName);
+
+    /**
      * @en update dynamic sub mesh geometry
      * @zh 更新动态子网格的几何数据
      * @param primitiveIndex: sub mesh index
@@ -412,15 +429,32 @@ public:
      */
     void updateSubMesh(index_t primitiveIndex, const IDynamicGeometry &geometry);
 
+    /**
+     * @en Set whether the data of this mesh could be accessed (read or wrote), it could be used only for static mesh
+     * @zh 设置此网格的数据是否可被存取，此接口只针对静态网格资源生效
+     * @param allowDataAccess @en Indicate whether the data of this mesh could be accessed (read or wrote) @zh 是否允许存取网格数据
+     */
+    void setAllowDataAccess(bool allowDataAccess);
+
+    /**
+     * @en Get whether the data of this mesh could be read or wrote
+     * @zh 获取此网格的数据是否可被存取
+     * @return @en whether the data of this mesh could be accessed (read or wrote) @zh 此网格的数据是否可被存取
+     */
+    inline bool isAllowDataAccess() const { return _allowDataAccess; }
+
 private:
     using AccessorType = std::function<void(const IVertexBundle &vertexBundle, int32_t iAttribute)>;
 
     void accessAttribute(index_t primitiveIndex, const char *attributeName, const AccessorType &accessor);
 
     gfx::BufferList createVertexBuffers(gfx::Device *gfxDevice, ArrayBuffer *data);
+    void tryConvertVertexData();
 
     void initDefault(const ccstd::optional<ccstd::string> &uuid) override;
     bool validate() const override;
+
+    void releaseData();
 
     static TypedArray createTypedArrayWithGFXFormat(gfx::Format format, uint32_t count);
 
@@ -433,6 +467,8 @@ private:
     Uint8Array _data;
 
     bool _initialized{false};
+    bool _allowDataAccess{true};
+    bool _isMeshDataUploaded{false};
 
     RenderingSubMeshList _renderingSubMeshes;
 

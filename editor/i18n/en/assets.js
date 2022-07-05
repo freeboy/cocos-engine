@@ -43,6 +43,7 @@ module.exports = {
             mipFilterTip: 'Mip Filter',
             wrapModeSTip: 'Wrap Mode S',
             wrapModeTTip: 'Wrap Mode T',
+            bakeReflectionConvolution: 'Bake Reflection Convolution',
             faceSize: {
                 name: 'Face Size',
                 title: 'Size of each cube face. If not specified, or specified as 0, the default size, which is the nearest power of two to (image.width)/4, is used.',
@@ -126,6 +127,14 @@ module.exports = {
             borderRightTip: 'The right margin of 9-slicing',
             edit: 'Edit',
             editTip: 'Edit',
+            meshType: 'Mesh Type',
+            meshTypeTip: 'Type of the mesh generated for the sprite frame',
+            pixelsToUnit: 'Pixels To Unit',
+            pixelsToUnitTip: 'How many pixels in the sprite frame correspond to one unit in the world space',
+            pivotX: 'Pivot X',
+            pivotXTip: 'The origin`s X-axis position of sprite frame in the local coordinate system',
+            pivotY: 'Pivot Y',
+            pivotYTip: 'The origin`s Y-axis position of sprite frame in the local coordinate system',
         },
         texture: {
             anisotropy: 'Anisotropy',
@@ -243,7 +252,7 @@ module.exports = {
                 original: 'Original',
             },
             limitMaterialDumpDir: 'The extracted path needs to be scoped to the project path.',
-            legacyOptions:'Legacy Options',
+            legacyOptions: 'Legacy Options',
             legacyFbxImporter: {
                 name: 'Compatible with v1.*',
                 title: 'Whether this importer should be compatible with its behaviour prior to Cocos Creator version 1.* .',
@@ -260,6 +269,12 @@ module.exports = {
                     'component) will not be used, this option can be checked to improve performance. But note that <br> ' +
                     'toggling this would update the corresponding prefab, so all the references in the scene should be <br>' +
                     'updated as well to accompany that. To be removed in further refactors.',
+            },
+            allowMeshDataAccess: {
+                name: 'Allow Data Access',
+                title:
+                    'Indicate whether the mesh data in this model could be read or write.<br>' +
+                    'If it is unchecked, the mesh data will be released after it is uploaded to GPU',
             },
             meshOptimizer: {
                 name: 'Mesh Optimizer',
@@ -325,7 +340,7 @@ module.exports = {
             smartMaterialEnabled: {
                 name: 'Smart Material Conversion',
                 title: 'Convert DCC materials to engine builtin materials which match the internal lighting model.',
-                warn: 'The laboratory feature "Smart Material Conversion" in the preferences is turned off, please enable this feature to modify model level settings.',
+                warn: 'The model feature "Smart Material Conversion" in the project settings is turned off, please enable this feature to modify model level settings.',
             },
         },
         textureCube: {
